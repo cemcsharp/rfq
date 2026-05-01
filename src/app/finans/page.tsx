@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, Suspense, useMemo } from 'react'
-import { useSearchParams } from 'next/navigation'
+import { useSearchParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { getFaturalar, getSiparisler, createFatura, updateFatura, deleteFatura, finalizeAttachments } from '@/lib/actions'
 import { ExportExcelButton } from '@/components/ExportButtons'
@@ -12,6 +12,7 @@ import { Pagination } from '@/components/Pagination'
 
 function FinansContent() {
     const searchParams = useSearchParams()
+    const router = useRouter()
     const [faturalar, setFaturalar] = useState<any[]>([])
     const [siparisler, setSiparisler] = useState<any[]>([])
     const [showModal, setShowModal] = useState(false)

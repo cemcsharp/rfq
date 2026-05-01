@@ -99,16 +99,32 @@ export async function registerTedarikci(input: TedarikciKayitInput) {
                     adres: input.adres,
                     yetkiliKisi: input.yetkiliAdi,
                     email: input.yetkiliEmail,
-                    kategoriId: kategori, // Ana kategori olarak ilkini seçiyoruz (Geriye dönük uyumluluk)
-                    kategoriler: {
-                        connect: input.kategoriIds.map(id => ({ id }))
-                    },
+                    kategoriId: kategori,
+                    // Davetli ise kategoriler doğrudan bağlanır
+                    ...(autoApprove ? {
+                        kategoriler: {
+                            connect: input.kategoriIds.map(id => ({ id }))
+                        }
+                    } : {}),
                     durum: autoApprove ? TedarikciDurum.AKTIF : TedarikciDurum.BEKLIYOR,
                     basvuruTarihi: new Date(),
                     onayTarihi: autoApprove ? new Date() : null,
                     aktif: autoApprove
                 }
             })
+
+            // Davetsiz kayıtlarda kategoriler onay sürecine girer
+            if (!autoApprove && input.kategoriIds.length > 0) {
+                for (const catId of input.kategoriIds) {
+                    await tx.tedarikciKategoriOnay.create({
+                        data: {
+                            tedarikciId: tedarikci.id,
+                            kategoriId: catId,
+                            durum: 'BEKLIYOR'
+                        }
+                    })
+                }
+            }
 
             // 2. User oluştur
             const user = await tx.user.create({

@@ -12,6 +12,7 @@ import { auth } from '@/auth'
 import { join } from 'path'
 import { unlink } from 'fs/promises'
 import { cwd } from 'process'
+import { generateSiparisPdfBuffer } from './pdfGenerator'
 
 // --- HELPER ACTIONS ---
 
@@ -301,25 +302,51 @@ export async function createTalep(data: {
         include: { kalemler: true, birim: true }
     })
 
-    // Bildirim gönder
-    if (talep.bildirimEmail) {
-        await createNotification({
-            title: 'Yeni Talep Bildirimi',
-            message: `${talep.barkod} referanslı talep oluşturuldu: ${talep.konu}`,
-            type: 'info',
-            link: '/talepler'
+    // Yöneticileri ve Bildirim E-postalarını topla
+    const notifyEmails = new Set<string>()
+    const notifyUserIds = new Set<string>()
+
+    if (talep.bildirimEmail) notifyEmails.add(talep.bildirimEmail)
+
+    if (talep.birimId) {
+        // Birim amirlerini bul
+        const yoneticiler = await prisma.personel.findMany({
+            where: { birimId: talep.birimId, isBirimYoneticisi: true },
+            include: { user: true }
         })
-        await sendInternalNotification(
-            talep.bildirimEmail,
-            `Yeni Talep Oluşturuldu: ${talep.barkod}`,
-            `
-            <h3>Yeni Talep Bildirimi</h3>
-            <p><strong>Talep No:</strong> ${talep.barkod}</p>
-            <p><strong>Konu:</strong> ${talep.konu}</p>
-            <p><strong>Gerekçe:</strong> ${talep.gerekce}</p>
-            <p>Talep başarıyla oluşturulmuş ve sisteme kaydedilmiştir.</p>
-            `
-        )
+        for (const y of yoneticiler) {
+            if (y.email) notifyEmails.add(y.email)
+            if (y.user?.email) notifyEmails.add(y.user.email)
+            if (y.user?.id) notifyUserIds.add(y.user.id)
+        }
+    }
+
+    // Uygulama İçi Bildirimleri Gönder (Sadece sistem kullanıcılarına)
+    for (const userId of Array.from(notifyUserIds)) {
+        await createNotification({
+            title: 'Yeni Talep (Onay/İnceleme Bekliyor)',
+            message: `${talep.barkod} referanslı ${talep.konu} başlıklı talep oluşturuldu.`,
+            type: 'info',
+            link: '/talepler',
+            userId: userId
+        })
+    }
+
+    // E-Posta Bildirimlerini Gönder
+    if (notifyEmails.size > 0) {
+        for (const email of Array.from(notifyEmails)) {
+            await sendInternalNotification(
+                email,
+                `Yeni Talep Oluşturuldu: ${talep.barkod}`,
+                `
+                <h3>Yeni Talep (Onay/İnceleme Bekliyor)</h3>
+                <p><strong>Talep No:</strong> ${talep.barkod}</p>
+                <p><strong>Konu:</strong> ${talep.konu}</p>
+                <p><strong>Gerekçe:</strong> ${talep.gerekce}</p>
+                <p>Birim personeli tarafından oluşturulan talep sisteme kaydedilmiştir, lütfen inceleyiniz.</p>
+                `
+            )
+        }
     }
 
     revalidatePath('/talepler')
@@ -354,7 +381,19 @@ export async function assignTalepToPersonel(talepId: number, personelId: number)
 export async function getTalep(id: number) {
     return JSON.parse(JSON.stringify(await prisma.talep.findUnique({
         where: { id },
-        include: { ilgiliKisi: true, siparis: true, kalemler: true, birim: true }
+        include: { 
+            ilgiliKisi: true, 
+            siparis: {
+                include: {
+                    degerlendirmeFormlari: {
+                        include: { formTipi: true, cevaplar: { include: { soru: { include: { grup: true } } } } }
+                    },
+                    degerlendirmeToken: true
+                }
+            }, 
+            kalemler: true, 
+            birim: true 
+        }
     })))
 }
 
@@ -891,6 +930,7 @@ export async function createTedarikci(data: {
     email?: string,
     adres?: string,
     vergiNo?: string,
+    vergiDairesi?: string,
     kategoriId?: number
 }) {
     await checkAuth(['ADMIN', 'SATINALMA'])
@@ -906,6 +946,7 @@ export async function updateTedarikci(id: number, data: {
     email?: string,
     adres?: string,
     vergiNo?: string,
+    vergiDairesi?: string,
     aktif?: boolean,
     kategoriId?: number
 }) {
@@ -1163,6 +1204,31 @@ export async function createDegerlendirmeFormu(data: {
 
     revalidatePath('/tedarikci')
     return form
+}
+
+export async function getTumDegerlendirmeler() {
+    const session = await checkAuth(['ADMIN', 'SATINALMA', 'BIRIM'])
+    
+    let whereClause = {}
+    if (session.user.role === 'BIRIM' && session.user.personelId) {
+        whereClause = {
+            siparis: {
+                talep: {
+                    ilgiliKisiId: session.user.personelId
+                }
+            }
+        }
+    }
+
+    return await prisma.tedarikciDegerlendirmeFormu.findMany({
+        where: whereClause,
+        include: {
+            tedarikci: true,
+            siparis: { include: { talep: true } },
+            formTipi: true
+        },
+        orderBy: { tarih: 'desc' }
+    })
 }
 
 export async function getTedarikciDegerlendirmeFormlari(tedarikciId: number) {
@@ -1423,12 +1489,30 @@ export async function getSystemNotifications() {
 }
 
 export async function getDashboardStats() {
-    await checkAuth(['ADMIN', 'SATINALMA', 'BIRIM'])
+    const session = await checkAuth(['ADMIN', 'SATINALMA', 'BIRIM'])
+    const role = (session.user as any).role
+    const personelId = (session.user as any).personelId
+
+    // BIRIM kullanıcısı için birimId bul
+    let birimId: number | null = null
+    if (role === 'BIRIM' && personelId) {
+        const personel = await prisma.personel.findUnique({
+            where: { id: personelId },
+            select: { birimId: true }
+        })
+        birimId = personel?.birimId || null
+    }
+
+    const birimFilter = birimId ? { birimId } : {}
+
     const [talepCount, activeOrdersCount, faturalar, expiringContractsCount] = await Promise.all([
-        prisma.talep.count(),
-        prisma.siparis.count({ where: { durum: 'BEKLEMEDE' } }),
+        prisma.talep.count({ where: birimFilter }),
+        prisma.siparis.count({ where: { durum: 'BEKLEMEDE', ...birimFilter } }),
         prisma.fatura.findMany({
-            where: { odemeDurumu: 'ODENMEDI' },
+            where: {
+                odemeDurumu: 'ODENMEDI',
+                ...(birimId ? { siparis: { birimId } } : {})
+            },
             select: {
                 tutar: true,
                 siparis: {
@@ -1443,7 +1527,10 @@ export async function getDashboardStats() {
             }
         }),
         prisma.sozlesme.count({
-            where: { bitisTarihi: { lte: new Date(new Date().getTime() + 30 * 24 * 60 * 60 * 1000) } }
+            where: {
+                bitisTarihi: { lte: new Date(new Date().getTime() + 30 * 24 * 60 * 60 * 1000) },
+                ...(birimId ? { siparis: { birimId } } : {})
+            }
         })
     ])
 
@@ -1463,10 +1550,23 @@ export async function getDashboardStats() {
 }
 
 export async function getRecentActivities() {
-    await checkAuth(['ADMIN', 'SATINALMA', 'BIRIM'])
+    const session = await checkAuth(['ADMIN', 'SATINALMA', 'BIRIM'])
+    const role = (session.user as any).role
+    const personelId = (session.user as any).personelId
+
+    let birimId: number | null = null
+    if (role === 'BIRIM' && personelId) {
+        const personel = await prisma.personel.findUnique({
+            where: { id: personelId },
+            select: { birimId: true }
+        })
+        birimId = personel?.birimId || null
+    }
+
     return await prisma.talep.findMany({
         take: 5,
         orderBy: { updatedAt: 'desc' },
+        where: birimId ? { birimId } : {},
         select: {
             id: true,
             konu: true,
@@ -2893,12 +2993,24 @@ export async function createOrdersFromRFQ(rfqId: number, birimId: number, yonetm
         // Send Order Email
         if (grup.tedarikci.email) {
             try {
+                // E-Posta Şablonu HTML
                 const emailHtml = renderOrderEmail(siparis, grup.tedarikci, rfq, grup.kalemler, sender)
+                
+                // PDF Sipariş Formunu (Buffer) Oluştur
+                const pdfBuffer = await generateSiparisPdfBuffer(siparis, grup.tedarikci, rfq, grup.kalemler, sender)
+
                 await transporter.sendMail({
                     from: smtp.from || `"Satinalma PRO" <${smtp.user}>`,
                     to: grup.tedarikci.email,
                     subject: `Sipariş Emri - ${siparis.barkod}`,
-                    html: emailHtml
+                    html: emailHtml,
+                    attachments: [
+                        {
+                            filename: `Siparis_Formu_${siparis.barkod}.pdf`,
+                            content: pdfBuffer,
+                            contentType: 'application/pdf'
+                        }
+                    ]
                 })
             } catch (err) {
                 console.error(`Sipariş maili gönderilemedi (${grup.tedarikci.email}):`, err)
@@ -3236,10 +3348,22 @@ export async function sendInternalNotification(to: string, subject: string, html
 // --- REPORTING & ANALYTICS ACTIONS ---
 
 export async function getReportingData(filters: { startDate?: Date, endDate?: Date } = {}) {
-    await checkAuth(['ADMIN', 'SATINALMA', 'BIRIM'])
+    const session = await checkAuth(['ADMIN', 'SATINALMA', 'BIRIM'])
+    const role = (session.user as any).role
+    const personelId = (session.user as any).personelId
+
+    let birimId: number | null = null
+    if (role === 'BIRIM' && personelId) {
+        const personel = await prisma.personel.findUnique({
+            where: { id: personelId },
+            select: { birimId: true }
+        })
+        birimId = personel?.birimId || null
+    }
+
     const { startDate, endDate } = filters
 
-    const where: any = {}
+    const where: any = birimId ? { birimId } : {}
     if (startDate || endDate) {
         where.tarih = {}
         if (startDate) where.tarih.gte = startDate
@@ -3353,9 +3477,24 @@ export async function getReportingData(filters: { startDate?: Date, endDate?: Da
 }
 
 export async function getPurchaserPerformance() {
-    await checkAuth(['ADMIN', 'SATINALMA', 'BIRIM'])
+    const session = await checkAuth(['ADMIN', 'SATINALMA', 'BIRIM'])
+    const role = (session.user as any).role
+    const personelId = (session.user as any).personelId
+
+    let birimId: number | null = null
+    if (role === 'BIRIM' && personelId) {
+        const personel = await prisma.personel.findUnique({
+            where: { id: personelId },
+            select: { birimId: true }
+        })
+        birimId = personel?.birimId || null
+    }
+
     const purchasers = await prisma.personel.findMany({
-        where: { aktif: true },
+        where: { 
+            aktif: true,
+            ...(birimId ? { birimId } : {})
+        },
         include: {
             olusturulanRFQler: {
                 include: {
@@ -3438,11 +3577,24 @@ export async function getPurchaserPerformance() {
 }
 
 export async function getSupplierPerformanceReport() {
-    await checkAuth(['ADMIN', 'SATINALMA', 'BIRIM'])
+    const session = await checkAuth(['ADMIN', 'SATINALMA', 'BIRIM'])
+    const role = (session.user as any).role
+    const personelId = (session.user as any).personelId
+
+    let birimId: number | null = null
+    if (role === 'BIRIM' && personelId) {
+        const personel = await prisma.personel.findUnique({
+            where: { id: personelId },
+            select: { birimId: true }
+        })
+        birimId = personel?.birimId || null
+    }
+
     const suppliers = await prisma.tedarikci.findMany({
         where: { aktif: true },
         include: {
             siparislar: {
+                where: birimId ? { birimId } : undefined,
                 include: {
                     kalemSecimleri: {
                         include: {
@@ -3505,7 +3657,7 @@ export async function sendEvaluationEmail(siparisId: number) {
     const siparis = await prisma.siparis.findUnique({
         where: { id: siparisId },
         include: {
-            talep: { include: { birim: true } },
+            talep: { include: { birim: true, ilgiliKisi: true } },
             tedarikci: true,
             degerlendirmeFormTipi: true
         }
@@ -3513,11 +3665,10 @@ export async function sendEvaluationEmail(siparisId: number) {
 
     if (!siparis || !siparis.tedarikci) return
 
-    // Birim mailini al (Talep üzerindeki veya Birim üzerindeki mail)
-    const targetEmail = siparis.talep.bildirimEmail || siparis.talep.birim?.email
+    // Birim mailini al (Öncelik ilgili kisi, sonra talep maili, sonra birim maili)
+    const targetEmail = siparis.talep.ilgiliKisi?.email || siparis.talep.bildirimEmail || siparis.talep.birim?.email
     if (!targetEmail) {
-        console.warn(`Sipariş ${siparis.barkod} için değerlendirme maili gönderilecek adres bulunamadı.`)
-        return
+        console.warn(`Sipariş ${siparis.barkod} için değerlendirme maili gönderilecek adres bulunamadı. Sadece portal bildirimi atılacak.`)
     }
 
     // Token oluştur
@@ -3528,24 +3679,51 @@ export async function sendEvaluationEmail(siparisId: number) {
         update: { token, kullanildi: false }
     })
 
-    // Email gönder
-    const smtp = await getSMTPConfig()
-    const transporter = nodemailer.createTransport({
-        host: smtp.host,
-        port: smtp.port,
-        secure: smtp.secure,
-        auth: { user: smtp.user, pass: smtp.pass }
-    })
-
     const evaluationLink = `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/degerlendir/${token}`
-    const emailHtml = renderEvaluationRequestEmail(siparis, evaluationLink)
 
-    await transporter.sendMail({
-        from: smtp.from || `"Satinalma PRO" <${smtp.user}>`,
-        to: targetEmail,
-        subject: `Tedarikçi Performans Değerlendirmesi - ${siparis.tedarikci.ad}`,
-        html: emailHtml
-    })
+    // Sistem içi portal bildirimi gönder
+    try {
+        const userToNotify = await prisma.user.findUnique({
+            where: { personelId: siparis.talep.ilgiliKisiId }
+        })
+        if (userToNotify) {
+            await prisma.notification.create({
+                data: {
+                    userId: userToNotify.id,
+                    title: 'Tedarikçi Değerlendirmesi Bekleniyor',
+                    message: `${siparis.barkod} siparişi tamamlandı. Kalitesini ve tedarikçiyi değerlendirmeniz bekleniyor.`,
+                    type: 'info',
+                    link: `/degerlendir/${token}`
+                }
+            })
+        }
+    } catch (err) {
+        console.error("Bildirim oluşturma hatası:", err)
+    }
+
+    // Email gönder
+    if (targetEmail) {
+        try {
+            const smtp = await getSMTPConfig()
+            const transporter = nodemailer.createTransport({
+                host: smtp.host,
+                port: smtp.port,
+                secure: smtp.secure,
+                auth: { user: smtp.user, pass: smtp.pass }
+            })
+
+            const emailHtml = renderEvaluationRequestEmail(siparis, evaluationLink)
+
+            await transporter.sendMail({
+                from: smtp.from || `"Satinalma PRO" <${smtp.user}>`,
+                to: targetEmail,
+                subject: `Tedarikçi Performans Değerlendirmesi - ${siparis.tedarikci.ad}`,
+                html: emailHtml
+            })
+        } catch (err) {
+            console.error("Değerlendirme e-postası gönderilemedi:", err)
+        }
+    }
 }
 
 export async function getDegerlendirmeByToken(token: string) {

@@ -39,6 +39,7 @@ export default function TedarikciPage() {
         telefon: '',
         email: '',
         vergiNo: '',
+        vergiDairesi: '',
         adres: '',
         kategoriId: '',
         aktif: true
@@ -75,7 +76,7 @@ export default function TedarikciPage() {
                 })
             }
             setShowModal(false)
-            setFormData({ ad: '', yetkiliKisi: '', telefon: '', email: '', vergiNo: '', adres: '', kategoriId: '', aktif: true })
+            setFormData({ ad: '', yetkiliKisi: '', telefon: '', email: '', vergiNo: '', vergiDairesi: '', adres: '', kategoriId: '', aktif: true })
             setEditingTedarikci(null)
             fetchData()
         } catch (err) {
@@ -129,6 +130,7 @@ export default function TedarikciPage() {
             telefon: t.telefon || '',
             email: t.email || '',
             vergiNo: t.vergiNo || '',
+            vergiDairesi: t.vergiDairesi || '',
             adres: t.adres || '',
             kategoriId: t.kategoriId?.toString() || '',
             aktif: t.aktif
@@ -163,7 +165,7 @@ export default function TedarikciPage() {
                         </button>
                     </div>
                     <button
-                        onClick={() => { setShowModal(true); setEditingTedarikci(null); setFormData({ ad: '', yetkiliKisi: '', telefon: '', email: '', vergiNo: '', adres: '', kategoriId: '', aktif: true }) }}
+                        onClick={() => { setShowModal(true); setEditingTedarikci(null); setFormData({ ad: '', yetkiliKisi: '', telefon: '', email: '', vergiNo: '', vergiDairesi: '', adres: '', kategoriId: '', aktif: true }) }}
                         className="bg-slate-700 text-white px-4 py-1.5 rounded text-[10px] font-medium border border-slate-600 hover:bg-slate-800 uppercase tracking-widest transition-all shadow-lg active:scale-95"
                     >
                         Yeni Tedarikçi Tanımla
@@ -372,14 +374,27 @@ export default function TedarikciPage() {
                                             </select>
                                         </div>
                                         <div className="flex flex-col gap-1.5">
-                                            <label className="text-[10px] font-medium text-slate-500 uppercase tracking-widest">Vergi No</label>
+                                            <label className="text-[10px] font-medium text-slate-500 uppercase tracking-widest">Vergi No *</label>
                                             <input
                                                 type="text"
+                                                required
                                                 className="w-full bg-white border border-slate-200 px-3 py-2 rounded text-[11px] font-medium text-slate-700 outline-none focus:ring-1 focus:ring-slate-400 transition-all text-center tracking-widest"
                                                 value={formData.vergiNo}
                                                 onChange={(e) => setFormData({ ...formData, vergiNo: e.target.value })}
                                             />
                                         </div>
+                                    </div>
+
+                                    <div className="flex flex-col gap-1.5">
+                                        <label className="text-[10px] font-medium text-slate-500 uppercase tracking-widest">Vergi Dairesi *</label>
+                                        <input
+                                            type="text"
+                                            required
+                                            placeholder="Örn: Kadıköy"
+                                            className="w-full bg-white border border-slate-200 px-3 py-2 rounded text-[11px] font-medium text-slate-700 outline-none focus:ring-1 focus:ring-slate-400 transition-all"
+                                            value={formData.vergiDairesi}
+                                            onChange={(e) => setFormData({ ...formData, vergiDairesi: e.target.value })}
+                                        />
                                     </div>
                                 </div>
 

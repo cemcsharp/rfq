@@ -139,6 +139,53 @@ export default function TalepDetailPage({ params }: { params: Promise<{ id: stri
                             </div>
                         )}
                     </div>
+
+                    {/* Değerlendirme Modülü */}
+                    {talep.siparis && talep.siparis.degerlendirmeFormTipiId && (
+                        <div className="premium-card p-6 space-y-4">
+                            <h3 className="text-[10px] font-black text-slate-800 uppercase tracking-widest flex items-center gap-2">
+                                <span className="w-1.5 h-4 bg-amber-500 rounded-full"></span>
+                                Tedarikçi Kalite Değerlendirmesi
+                            </h3>
+                            
+                            {talep.siparis.degerlendirmeFormlari && talep.siparis.degerlendirmeFormlari.length > 0 ? (
+                                <div className="bg-slate-50 border border-slate-100 p-4 rounded-xl flex items-center justify-between">
+                                    <div>
+                                        <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mb-1">Genel Puan</p>
+                                        <div className="text-2xl font-black text-slate-800">
+                                            {talep.siparis.degerlendirmeFormlari[0].genelPuan.toFixed(2)} <span className="text-sm float-none font-bold text-slate-400">/ 5.00</span>
+                                        </div>
+                                    </div>
+                                    <div className="text-right">
+                                        <span className={`px-4 py-2 rounded-full text-[10px] font-bold tracking-widest uppercase border
+                                            ${talep.siparis.degerlendirmeFormlari[0].sonuc === 'ONAYLI' ? 'bg-emerald-50 text-emerald-600 border-emerald-200' :
+                                              talep.siparis.degerlendirmeFormlari[0].sonuc === 'CALISABILIR' ? 'bg-indigo-50 text-indigo-600 border-indigo-200' :
+                                              talep.siparis.degerlendirmeFormlari[0].sonuc === 'SARTLI' ? 'bg-amber-50 text-amber-600 border-amber-200' :
+                                              'bg-rose-50 text-rose-600 border-rose-200'}
+                                        `}>
+                                            {talep.siparis.degerlendirmeFormlari[0].sonuc}
+                                        </span>
+                                        <p className="text-[9px] font-bold capitalize text-slate-400 mt-2 text-right">Değerlendiren: {talep.siparis.degerlendirmeFormlari[0].degerlendiren}</p>
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="bg-amber-50 border border-amber-100 p-4 rounded-xl flex items-center justify-between">
+                                    <div className="space-y-1">
+                                        <p className="text-sm font-bold text-amber-800">Değerlendirme Bekleniyor</p>
+                                        <p className="text-[10px] font-semibold text-amber-600 tracking-wide">Sipariş teslim edildi, lütfen tedarikçinin performansını puanlayın.</p>
+                                    </div>
+                                    {talep.siparis.degerlendirmeToken && !talep.siparis.degerlendirmeToken.kullanildi && (
+                                        <button 
+                                            onClick={() => window.open(`/degerlendir/${talep.siparis.degerlendirmeToken.token}`, '_blank')}
+                                            className="px-5 py-2.5 bg-amber-500 hover:bg-amber-600 text-white rounded-lg font-black text-[10px] uppercase tracking-widest transition-all shadow-md active:scale-95"
+                                        >
+                                            Hemen Puanla
+                                        </button>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+                    )}
                 </div>
 
                 {/* Sidebar - Attachments & Info */}

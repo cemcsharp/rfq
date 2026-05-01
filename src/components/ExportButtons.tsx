@@ -3,7 +3,6 @@
 import React, { useState, useEffect } from 'react'
 import * as XLSX from 'xlsx'
 import { PDFDownloadLink } from '@react-pdf/renderer'
-import { OrderPdfTemplate } from './OrderPdfTemplate'
 import { RfqPdfTemplate } from './RfqPdfTemplate'
 import { RfqListPdfTemplate } from './RfqListPdfTemplate'
 
@@ -46,13 +45,15 @@ export const OrderPdfButton: React.FC<OrderPdfButtonProps> = ({ order }) => {
     )
 
     return (
-        <PDFDownloadLink
-            document={<OrderPdfTemplate order={order} />}
-            fileName={`Siparis-${order.barkod}.pdf`}
+        <a
+            href={`/api/siparis/${order.id}/pdf`}
+            download={`Siparis-${order.barkod}.pdf`}
+            target="_blank"
+            rel="noopener noreferrer"
             className="bg-slate-800 text-white px-5 py-2 rounded text-[11px] font-bold hover:bg-slate-900 transition-all uppercase tracking-widest shadow-md flex items-center gap-2 no-underline"
         >
-            {({ loading }) => (loading ? 'Döküman Hazırlanıyor...' : '📄 Sipariş Formu PDF')}
-        </PDFDownloadLink>
+            📄 Sipariş Formu PDF
+        </a>
     )
 }
 

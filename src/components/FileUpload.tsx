@@ -69,12 +69,13 @@ export default function FileUpload({ relatedEntity, entityId, onSuccess, label =
 
     return (
         <div
-            className={`relative border-2 border-dashed rounded-xl p-6 transition-all duration-200 text-center ${dragActive ? 'border-indigo-500 bg-indigo-50' : 'border-slate-200 hover:border-slate-300 bg-slate-50/50'
+            className={`group relative border-2 border-dashed rounded-xl p-6 transition-all duration-200 text-center cursor-pointer ${dragActive ? 'border-indigo-500 bg-indigo-50' : 'border-slate-300 hover:border-indigo-400 hover:bg-slate-50 shadow-sm hover:shadow-md'
                 }`}
             onDragEnter={handleDrag}
             onDragLeave={handleDrag}
             onDragOver={handleDrag}
             onDrop={handleDrop}
+            onClick={() => !uploading && fileInputRef.current?.click()}
         >
             <input
                 ref={fileInputRef}
@@ -85,7 +86,7 @@ export default function FileUpload({ relatedEntity, entityId, onSuccess, label =
             />
 
             <div className="flex flex-col items-center gap-2">
-                <div className="w-10 h-10 rounded-full bg-white shadow-sm flex items-center justify-center text-slate-400">
+                <div className="w-10 h-10 rounded-full bg-white shadow-sm flex items-center justify-center text-slate-400 group-hover:text-indigo-500 transition-colors">
                     {uploading ? (
                         <div className="w-5 h-5 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
                     ) : (
@@ -97,9 +98,9 @@ export default function FileUpload({ relatedEntity, entityId, onSuccess, label =
                 <div>
                     <button
                         type="button"
-                        onClick={() => fileInputRef.current?.click()}
+                        onClick={(e) => { e.stopPropagation(); if(!uploading) fileInputRef.current?.click(); }}
                         disabled={uploading}
-                        className="text-xs font-bold text-indigo-600 hover:text-indigo-700 uppercase tracking-widest disabled:opacity-50"
+                        className="text-[11px] font-bold text-indigo-600 hover:text-indigo-700 uppercase tracking-widest disabled:opacity-50 border-b border-transparent hover:border-indigo-700 pb-0.5"
                     >
                         {uploading ? 'Yükleniyor...' : label}
                     </button>

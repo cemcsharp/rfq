@@ -28,3 +28,8 @@ cleanup_data.ts
 # Personal Notes
 yapılacaklar
 GIRIS_BILGILERI.md
+
+# Uploads and Temp Files
+public/uploads/*.pdf
+tmp/
+

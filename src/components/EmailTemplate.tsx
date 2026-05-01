@@ -119,22 +119,7 @@ export function renderRfqClosedEmail(rfqTitle: string, rfqNo: string) {
 }
 
 export function renderOrderEmail(siparis: any, tedarikci: any, rfq: any, kalemler: any[], sender: any) {
-    const kalemlerHtml = kalemler.map((k: any) => {
-        const teklif = k.siparisSecimi.teklif
-        const kalemTeklif = teklif.kalemler.find((tk: any) => tk.talepKalem.id === k.talepKalemId)
-        const birimFiyat = kalemTeklif ? Number(kalemTeklif.birimFiyat) : 0
-        const miktar = k.miktar || k.talepKalem.miktar
-        const tutar = birimFiyat * miktar
-
-        return `
-        <tr>
-            <td style="padding: 10px; border-bottom: 1px solid #edf2f7; font-size: 14px; color: #4a5568;">${k.talepKalem.aciklama}</td>
-            <td style="padding: 10px; border-bottom: 1px solid #edf2f7; font-size: 14px; color: #4a5568; text-align: right;">${miktar} ${k.talepKalem.birim}</td>
-            <td style="padding: 10px; border-bottom: 1px solid #edf2f7; font-size: 14px; color: #4a5568; text-align: right;">${birimFiyat.toLocaleString('tr-TR', { minimumFractionDigits: 2 })} ${teklif.paraBirimi}</td>
-            <td style="padding: 10px; border-bottom: 1px solid #edf2f7; font-size: 14px; color: #4a5568; text-align: right; font-weight: bold;">${tutar.toLocaleString('tr-TR', { minimumFractionDigits: 2 })} ${teklif.paraBirimi}</td>
-        </tr>
-        `
-    }).join('')
+    const siparisTarihi = new Date().toLocaleDateString('tr-TR')
 
     return `
     <!DOCTYPE html>
@@ -142,64 +127,50 @@ export function renderOrderEmail(siparis: any, tedarikci: any, rfq: any, kalemle
     <head>
         <meta charset="utf-8">
         <style>
-            body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; color: #2d3748; margin: 0; padding: 0; background-color: #f7fafc; }
-            .container { max-width: 700px; margin: 20px auto; background: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
-            .header { background: #2f855a; color: #ffffff; padding: 30px; text-align: center; }
-            .content { padding: 30px; }
-            .footer { background: #edf2f7; color: #718096; padding: 20px; text-align: center; font-size: 12px; }
-            .table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-            .th { background: #f8fafc; padding: 12px; text-align: left; border-bottom: 2px solid #e2e8f0; font-size: 12px; text-transform: uppercase; color: #64748b; }
-            .signature { margin-top: 30px; padding-top: 20px; border-top: 1px dashed #e2e8f0; font-style: italic; }
-            .info-box { background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 6px; padding: 15px; margin-bottom: 20px; }
+            body { font-family: 'Inter', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; color: #1e293b; margin: 0; padding: 20px; background-color: #f8fafc; }
+            .container { max-width: 600px; margin: 20px auto; background: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
+            .header { background: #0f172a; color: #ffffff; padding: 30px; text-align: center; }
+            .content { padding: 40px; }
+            .footer { background: #f1f5f9; color: #64748b; padding: 20px; text-align: center; font-size: 13px; border-top: 1px solid #e2e8f0; }
+            .icon-box { display: inline-block; width: 60px; height: 60px; background: #10b981; border-radius: 50%; color: white; line-height: 60px; font-size: 24px; margin-bottom: 20px; }
+            .attachment-info { margin-top: 30px; padding: 15px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 14px; text-align: center; color: #334155; }
+            .attachment-info strong { color: #0f172a; }
         </style>
     </head>
     <body>
         <div class="container">
             <div class="header">
-                <h1 style="margin: 0; font-size: 24px; letter-spacing: 2px;">SİPARİŞ EMRİ</h1>
-                <p style="margin: 5px 0 0; opacity: 0.9; font-size: 14px;">${siparis.barkod}</p>
+                <div class="icon-box">✓</div>
+                <h1 style="margin: 0; font-size: 22px; font-weight: 700; letter-spacing: 0.5px;">Siparişiniz Onaylandı</h1>
+                <p style="margin: 8px 0 0; opacity: 0.8; font-size: 14px;">Bizi tercih ettiğiniz için teşekkür ederiz.</p>
             </div>
             <div class="content">
-                <p>Sayın <strong>${tedarikci.ad}</strong>,</p>
-                <p>Aşağıda detayları belirtilen ürün/hizmetler için siparişimiz onaylanmıştır.</p>
+                <p style="font-size: 16px;">Sayın <strong>${tedarikci.ad}</strong>,</p>
+                <p style="font-size: 15px;">Aşağıda özet bilgileri yer alan yeni siparişinizin sisteme girişi ve onayı tamamlanmıştır.</p>
                 
-                <div class="info-box">
-                    <p style="margin: 0 0 5px; font-size: 13px;"><strong>İlgili RFQ:</strong> ${rfq.rfqNo} - ${rfq.baslik}</p>
-                    <p style="margin: 0; font-size: 13px;"><strong>Sipariş Tarihi:</strong> ${new Date().toLocaleDateString('tr-TR')}</p>
+                <div style="margin: 25px 0; border-left: 3px solid #10b981; padding-left: 15px;">
+                    <p style="margin: 0 0 5px;"><strong>Sipariş No (PO):</strong> ${siparis.barkod}</p>
+                    <p style="margin: 0 0 5px;"><strong>İlgili RFQ:</strong> ${rfq.rfqNo} - ${rfq.baslik}</p>
+                    <p style="margin: 0;"><strong>Sipariş Tarihi:</strong> ${siparisTarihi}</p>
                 </div>
 
-                <table class="table">
-                    <thead>
-                        <tr>
-                            <th class="th">Ürün/Hizmet</th>
-                            <th class="th" style="text-align: right;">Miktar</th>
-                            <th class="th" style="text-align: right;">Birim Fiyat</th>
-                            <th class="th" style="text-align: right;">Tutar</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${kalemlerHtml}
-                    </tbody>
-                </table>
+                <div class="attachment-info">
+                    📎 Resmi <strong>Sipariş Emri (Purchase Order)</strong> evrakınızı PDF dosyası biçiminde bu e-postanın ekinde bulabilirsiniz. Bütün detaylar evrakta yer almaktadır.
+                </div>
                 
-                <p style="margin-top: 25px; font-size: 14px;">
-                    Lütfen sipariş teyidini ve tahmini teslimat tarihini tarafımıza iletiniz.
-                    Fatura kesiminde sipariş numarasının belirtilmesi zorunludur.
+                <p style="margin-top: 30px; font-size: 15px;">
+                    Sipariş onayı (Order Confirmation) ve termin süreniz ile ilgili geri dönüşünüzü beklemekteyiz.
                 </p>
 
-                <div class="signature">
-                    <p style="margin: 0; color: #4a5568;">Saygılarımızla,</p>
-                    <p style="margin: 5px 0 0; font-weight: bold; color: #2d3748;">${sender.name}</p>
-                    <p style="margin: 2px 0 0; color: #4a5568; font-size: 13px;">${sender.title}</p>
-                    <div style="margin-top: 10px; font-size: 12px; color: #718096;">
-                        <p style="margin: 2px 0;">📞 ${sender.phone || '-'}</p>
-                        <p style="margin: 2px 0;">📧 ${sender.email || '-'}</p>
-                    </div>
+                <div style="margin-top: 40px; padding-top: 20px; border-top: 1px dashed #cbd5e1;">
+                    <p style="margin: 0; color: #475569; font-size: 14px;">Saygılarımızla,</p>
+                    <p style="margin: 5px 0 0; font-weight: 700; color: #0f172a;">${sender.name}</p>
+                    <p style="margin: 2px 0 0; color: #64748b; font-size: 13px;">${sender.title}</p>
                 </div>
             </div>
             <div class="footer">
-                <p>Bu e-posta <strong>PRU - Satınalma Platformu</strong> sistemi tarafından otomatik olarak oluşturulmuştur.</p>
-                <p>&copy; ${new Date().getFullYear()} Kurumsal Tedarik Yönetimi</p>
+                Bu mesaj PRU Satınalma ve Tedarik Zinciri Uygulaması tarafından gönderilmiştir. <br>
+                Kurumsal Tedarik Merkezi
             </div>
         </div>
     </body>

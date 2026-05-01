@@ -28,11 +28,18 @@ export default function Sidebar({ isOpen, isCollapsed, onClose }: { isOpen?: boo
             ]
         },
         {
+            title: 'Kullanıcı & Organizasyon',
+            items: [
+                { href: '/kullanici-yonetimi', icon: '👥', label: 'Kullanıcı Yönetimi', roles: ['ADMIN'] },
+            ]
+        },
+        {
             title: 'Satınalma Süreçleri',
             items: [
                 { href: '/talepler', icon: '📝', label: 'Satınalma Talepleri', roles: ['ADMIN', 'SATINALMA', 'BIRIM'] },
                 { href: '/rfq', icon: '📨', label: 'Teklif İstemleri (RFQ)', roles: ['ADMIN', 'SATINALMA'] },
                 { href: '/siparisler', icon: '⚙️', label: 'Sipariş Süreçleri', roles: ['ADMIN', 'SATINALMA'] },
+                { href: '/degerlendirmeler', icon: '⭐', label: 'Geçmiş Değerlendirmeler', roles: ['ADMIN', 'SATINALMA', 'BIRIM'] },
             ]
         },
         {
